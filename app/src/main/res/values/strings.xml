@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Phone-agent</string>
+    <string name="accessibility_service_description">Lets the local MCP server read UI elements and perform taps, typing, swipes, back, and home actions when you explicitly enable it.</string>
+    <string name="notification_channel_name">Phone control</string>
+    <string name="notification_title">Phone control active</string>
+    <string name="notification_text">An AI agent can currently control this device</string>
+</resources>
