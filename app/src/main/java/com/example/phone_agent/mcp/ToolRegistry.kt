@@ -123,6 +123,13 @@ object ToolRegistry {
         ) {
             ToolCallResult(service().goBack())
         },
+        tool(
+            name = "press_enter",
+            description = "Submit or search the currently focused editable field (IME enter/go).",
+            inputSchema = schema(),
+        ) {
+            ToolCallResult(service().pressEnter())
+        },
     )
 
     suspend fun call(

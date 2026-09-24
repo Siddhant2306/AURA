@@ -12,6 +12,8 @@ import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.annotation.RequiresApi
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -145,6 +147,16 @@ class PhoneControlService : AccessibilityService() {
     suspend fun goBack(): String = withContext(Dispatchers.Main) {
         check(performGlobalAction(GLOBAL_ACTION_BACK)) { "Back action failed" }
         "Sent BACK"
+    }
+
+    @RequiresApi(Build.VERSION_CODES.R)
+    suspend fun pressEnter(): String = withContext(Dispatchers.Main) {
+        val focusedNode = findFocusedEditableNode()
+            ?: throw IllegalStateException("No editable field is focused to submit")
+        val submitted = focusedNode.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id) ||
+            focusedNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        check(submitted) { "Could not submit the focused field" }
+        "Pressed enter/submit on the focused field"
     }
 
     private fun configureServiceInfo() {
