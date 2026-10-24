@@ -2,9 +2,10 @@ package com.example.phone_agent.agent.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 @Serializable
 data class ChatMessage(
     val role: String,
@@ -12,18 +13,24 @@ data class ChatMessage(
     val thinking: String? = null,
 )
 
+
 @Serializable
 data class OllamaOptions(
-    val temperature: Double = 0.0,
-    val num_predict: Int = 1024,
+    val temperature: Double = 0.2,
+    val repeat_penalty: Double = 1.1,
+    val repeat_last_n: Int = 64,
+    val num_predict: Int = 256,
+    val num_ctx: Int = 8192,
 )
+
+
 
 @Serializable
 data class OllamaChatRequest(
     val model: String,
     val messages: List<ChatMessage>,
     val stream: Boolean = false,
-    val format: String? = "json",
+    val format: JsonElement? = JsonPrimitive("json"),
     val think: Boolean = false,
     val options: OllamaOptions = OllamaOptions(),
 )
@@ -32,6 +39,7 @@ data class OllamaChatRequest(
 data class OllamaChatResponse(
     val message: ChatMessage? = null,
     val done: Boolean = false,
+    @SerialName("done_reason") val doneReason: String? = null,
 )
 
 @Serializable
@@ -55,19 +63,60 @@ data class McpToolResult(
 )
 
 @Serializable
+enum class AgentResponseType {
+    @SerialName("plan") PLAN,
+    @SerialName("act") ACT,
+    @SerialName("complete") COMPLETE,
+    @SerialName("stop") STOP,
+}
+
+/** One documented wire contract, with mutually exclusive payloads validated by PlanParser. */
+@Serializable
 data class AgentPlan(
-    /** High-level steps the agent intends to follow for the user's task. */
-    val plan: List<String> = emptyList(),
-    @SerialName("tool_calls")
-    val toolCalls: List<AgentToolCall> = emptyList(),
-    val final: String? = null,
-    @Transient
-    val parseError: Boolean = false,
+    val type: AgentResponseType,
+    val goals: List<AgentGoal>? = null,
+    @SerialName("goal_id") val goalId: String? = null,
+    val action: AgentToolCall? = null,
+    val evidence: CompletionEvidence? = null,
+    val reason: String? = null,
 )
+
+@Serializable
+data class AgentGoal(
+    val description: String,
+    @SerialName("success_condition") val successCondition: String,
+    @SerialName("expected_ui") val expectedUi: UiExpectation? = null,
+)
+
+@Serializable
+data class CompletionEvidence(
+    @SerialName("action_id") val actionId: Int,
+    val text: String,
+    @SerialName("expected_ui") val expectedUi: UiExpectation? = null,
+)
+
 @Serializable
 data class AgentToolCall(
     val name: String,
     val arguments: JsonObject = buildJsonObject { },
+    @SerialName("expected_ui") val expectedUi: UiExpectation? = null,
+    @SerialName("recovery_reason") val recoveryReason: String? = null,
+)
+@Serializable
+data class StepCompletion(
+    @SerialName("step_id") val stepId: String,
+    @SerialName("action_id") val actionId: Int,
+    val evidence: String = "",
+    @SerialName("expected_ui") val expectedUi: UiExpectation? = null,
+)
+
+/** Observable conditions, checked against the actual accessibility nodes (all supplied fields must match). */
+@Serializable
+data class UiExpectation(
+    @SerialName("package_name") val packageName: String? = null,
+    val text: String? = null,
+    @SerialName("editable_text") val editableText: String? = null,
+    @SerialName("focused_editable") val focusedEditable: Boolean? = null,
 )
 
 data class AgentRunResult(

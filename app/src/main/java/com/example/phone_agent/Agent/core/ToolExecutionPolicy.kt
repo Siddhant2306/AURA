@@ -32,6 +32,17 @@ object ToolExecutionPolicy {
 
     fun isUiChanging(toolName: String): Boolean = toolName in uiChangingTools
 
+    internal fun preconditionError(toolName: String, screen: String?, desiredInput: String? = null): String? {
+        if (toolName !in setOf("type_text", "press_enter") || screen == null) return null
+        val observation = UiObservation.parse(screen) ?: return null
+        if (observation.nodes.none { it["editable"]?.toString() == "true" && it["focused"]?.toString() == "true" })
+            return "$toolName requires a focused editable input; inspect the current page or activate the intended input first."
+        val before = observation.inputText()
+        return if (toolName == "type_text" && desiredInput != null && before != null &&
+            (before == desiredInput || !desiredInput.startsWith(before)))
+            "Appending cannot achieve the declared input value. Complete if it is already correct, or use the set-field tool." else null
+    }
+
     suspend fun waitForUiSettle(toolName: String) {
         val delayMs = settleDelayMs[toolName] ?: return
         delay(delayMs)

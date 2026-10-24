@@ -593,10 +593,11 @@ private suspend fun runFridayCommand(
         voiceController.setThinking(command)
 
         val preflight = FridayAgent.preflight(
-            accessibilityReady = accessibilityReady,
-            mcpServerRunning = serverRunning,
+            accessibilityReady = PhoneControlService.instance != null,
+            mcpServerRunning = McpForegroundService.isRunning,
             bearerToken = config.mcpBearerToken,
         )
+        Log.d("FridayAgent", "PREFLIGHT ready=${preflight.ready} accessibility=${PhoneControlService.instance != null} server=${McpForegroundService.isRunning}")
         if (!preflight.ready) {
             voiceController.speak(preflight.message)
             return@runExclusive
@@ -684,7 +685,7 @@ private const val PREF_TOKEN = "bearer_token"
 private const val PREF_OLLAMA_URL = "ollama_url"
 private const val PREF_OLLAMA_MODEL = "ollama_model"
 private const val PREF_MCP_URL = "mcp_url"
-private const val DEFAULT_OLLAMA_URL = "http://10.20.16.233:11434"
+private const val DEFAULT_OLLAMA_URL = "http://10.20.7.72:11434"
 private const val DEFAULT_OLLAMA_MODEL = "qwen3:4b"
 private const val DEFAULT_MCP_URL = "http://127.0.0.1:8080"
 

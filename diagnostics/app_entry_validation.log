@@ -1,0 +1,61 @@
+10-25 00:25:30.728 15047 15047 D FridayAgent: PREFLIGHT ready=true accessibility=true server=true
+10-25 00:25:31.898 15047 15047 D FridayAgent: MODEL_REQUEST phase=plan messages=3 chars=4696 input_context=8192 retry=0
+10-25 00:26:00.905 15047 15047 D FridayAgent: MODEL_REQUEST phase=decision messages=3 chars=6935 input_context=8192 retry=0
+10-25 00:26:10.203 15047 15047 D FridayAgent: MODEL_DECISION goal=s1 type=ACT no_progress=1 repeats=1 fresh=false
+10-25 00:26:10.204 15047 15047 D FridayAgent: SELECTED_TOOL goal=s1 name=open_app validated_arguments={package_name="com.android.chrome"} attempt=1
+10-25 00:26:10.348 15047 15047 D FridayAgent: TOOL_RESULT action=1 tool=open_app is_error=false result_chars=37
+10-25 00:26:11.560 15047 15047 D FridayAgent: SELECTED_TOOL goal=s1 name=get_ui_tree validated_arguments={} attempt=1
+10-25 00:26:15.172 15047 15047 D FridayAgent: TOOL_RESULT action=2 tool=get_ui_tree is_error=false result_chars=44723
+10-25 00:26:15.324 15047 15047 D FridayAgent: UI_OBSERVATION action=2 package=com.android.chrome fresh=true chars=44723
+10-25 00:26:15.423 15047 15047 D FridayAgent: PROGRESS goal=s1 reason=first usable observation
+10-25 00:26:15.423 15047 15047 D FridayAgent: PROGRESS goal=s1 reason=action effect verified
+10-25 00:26:15.579 15047 15047 D FridayAgent: GOAL_COMPLETION goal=s1 verified=true source_action=2 source_tool=get_ui_tree evidence_chars=18
+10-25 00:26:15.579 15047 15047 D FridayAgent: PROGRESS goal=s2 reason=foreground goal verified by Kotlin against fresh UI
+10-25 00:26:16.409 15047 15047 D FridayAgent: MODEL_REQUEST phase=decision messages=3 chars=14019 input_context=8192 retry=0
+10-25 00:26:25.657 15047 15047 D FridayAgent: MODEL_DECISION goal=s2 type=ACT no_progress=1 repeats=1 fresh=true
+10-25 00:26:25.657 15047 15047 D FridayAgent: SELECTED_TOOL goal=s2 name=get_ui_tree validated_arguments={} attempt=1
+10-25 00:26:26.652 15047 15047 D FridayAgent: TOOL_RESULT action=3 tool=get_ui_tree is_error=false result_chars=44723
+10-25 00:26:26.718 15047 15047 D FridayAgent: UI_OBSERVATION action=3 package=com.android.chrome fresh=true chars=44723
+10-25 00:26:28.052 15047 15047 D FridayAgent: MODEL_REQUEST phase=decision messages=3 chars=14429 input_context=8192 retry=0
+10-25 00:26:37.222 15047 15047 D FridayAgent: MODEL_DECISION goal=s2 type=ACT no_progress=1 repeats=1 fresh=true
+10-25 00:26:38.008 15047 15047 D FridayAgent: CACHED_OBSERVATION_EXPANDED goal=s2 page=1
+10-25 00:26:39.243 15047 15047 D FridayAgent: MODEL_REQUEST phase=decision messages=3 chars=14407 input_context=8192 retry=0
+10-25 00:26:49.207 15047 15047 D FridayAgent: MODEL_DECISION goal=s2 type=ACT no_progress=1 repeats=1 fresh=true
+10-25 00:26:49.997 15047 15047 D FridayAgent: REJECTED goal=s2 count=1 reason=Cached inspection budget exhausted; assess the real results or stop.
+10-25 00:26:51.450 15047 15047 D FridayAgent: MODEL_REQUEST phase=decision messages=3 chars=18747 input_context=8192 retry=0
+10-25 00:27:07.533 15047 15047 D FridayAgent: MODEL_DECISION goal=s2 type=COMPLETE no_progress=2 repeats=1 fresh=true
+10-25 00:27:07.645 15047 15047 D FridayAgent: GOAL_COMPLETION goal=s2 verified=true source_action=3 source_tool=get_ui_tree evidence_chars=33
+10-25 00:27:07.645 15047 15047 D FridayAgent: PROGRESS goal=null reason=goal completed with real evidence
+10-25 00:27:07.646 15047 15047 D FridayAgent: FINAL_OUTCOME success=true goals=2
+10-25 00:28:16.160 15047 15047 D FridayAgent: PREFLIGHT ready=true accessibility=true server=true
+10-25 00:28:16.425 15047 15047 D FridayAgent: MODEL_REQUEST phase=plan messages=3 chars=4696 input_context=8192 retry=0
+10-25 00:28:26.789 15047 15047 D FridayAgent: MODEL_REQUEST phase=decision messages=3 chars=6935 input_context=8192 retry=0
+10-25 00:28:32.730 15047 15047 D FridayAgent: MODEL_DECISION goal=s1 type=ACT no_progress=1 repeats=1 fresh=false
+10-25 00:28:32.730 15047 15047 D FridayAgent: SELECTED_TOOL goal=s1 name=open_app validated_arguments={package_name="com.android.chrome"} attempt=1
+10-25 00:28:32.857 15047 15047 D FridayAgent: TOOL_RESULT action=1 tool=open_app is_error=false result_chars=37
+10-25 00:28:34.062 15047 15047 D FridayAgent: SELECTED_TOOL goal=s1 name=get_ui_tree validated_arguments={} attempt=1
+10-25 00:28:34.199 15047 15047 D FridayAgent: TOOL_RESULT action=2 tool=get_ui_tree is_error=false result_chars=1029
+10-25 00:28:34.201 15047 15047 D FridayAgent: UI_OBSERVATION action=2 package=com.android.chrome fresh=true chars=1029
+10-25 00:28:34.203 15047 15047 D FridayAgent: PROGRESS goal=s1 reason=first usable observation
+10-25 00:28:34.203 15047 15047 D FridayAgent: PROGRESS goal=s1 reason=action effect verified
+10-25 00:28:34.210 15047 15047 D FridayAgent: GOAL_COMPLETION goal=s1 verified=true source_action=2 source_tool=get_ui_tree evidence_chars=18
+10-25 00:28:34.210 15047 15047 D FridayAgent: PROGRESS goal=s2 reason=foreground goal verified by Kotlin against fresh UI
+10-25 00:28:34.243 15047 15047 D FridayAgent: MODEL_REQUEST phase=decision messages=3 chars=8057 input_context=8192 retry=0
+10-25 00:28:42.294 15047 15047 D FridayAgent: MODEL_DECISION goal=s2 type=ACT no_progress=1 repeats=1 fresh=true
+10-25 00:28:42.295 15047 15047 D FridayAgent: SELECTED_TOOL goal=s2 name=get_ui_tree validated_arguments={} attempt=1
+10-25 00:28:42.401 15047 15047 D FridayAgent: TOOL_RESULT action=3 tool=get_ui_tree is_error=false result_chars=1029
+10-25 00:28:42.403 15047 15047 D FridayAgent: UI_OBSERVATION action=3 package=com.android.chrome fresh=true chars=1029
+10-25 00:28:42.435 15047 15047 D FridayAgent: MODEL_REQUEST phase=decision messages=3 chars=8467 input_context=8192 retry=0
+10-25 00:28:47.698 15047 15047 D FridayAgent: MODEL_DECISION goal=s2 type=ACT no_progress=1 repeats=1 fresh=true
+10-25 00:28:47.715 15047 15047 D FridayAgent: CACHED_OBSERVATION_EXPANDED goal=s2 page=1
+10-25 00:28:47.739 15047 15047 D FridayAgent: MODEL_REQUEST phase=decision messages=3 chars=8617 input_context=8192 retry=0
+10-25 00:28:53.131 15047 15047 D FridayAgent: MODEL_DECISION goal=s2 type=ACT no_progress=1 repeats=1 fresh=true
+10-25 00:28:53.152 15047 15047 D FridayAgent: REJECTED goal=s2 count=1 reason=Cached inspection budget exhausted; assess the real results or stop.
+10-25 00:28:53.183 15047 15047 D FridayAgent: MODEL_REQUEST phase=decision messages=3 chars=8978 input_context=8192 retry=0
+10-25 00:29:00.723 15047 15047 D FridayAgent: MODEL_DECISION goal=s2 type=COMPLETE no_progress=2 repeats=1 fresh=true
+10-25 00:29:00.735 15047 15047 D FridayAgent: STEP_VERIFICATION step=s2 verified=false reason=Step outcome does not match observed nodes
+10-25 00:29:00.735 15047 15047 D FridayAgent: REJECTED goal=s2 count=2 reason=Completion rejected. Cite a successful real read result or current UI action_id and observed text supporting the goal's success condition.
+10-25 00:29:00.762 15047 15047 D FridayAgent: MODEL_REQUEST phase=decision messages=3 chars=8660 input_context=8192 retry=0
+10-25 00:29:06.240 15047 15047 D FridayAgent: MODEL_DECISION goal=s2 type=ACT no_progress=2 repeats=2 fresh=true
+10-25 00:29:06.263 15047 15047 D FridayAgent: REJECTED goal=s2 count=3 reason=Cached inspection budget exhausted; assess the real results or stop.
+10-25 00:29:06.264 15047 15047 D FridayAgent: FINAL_OUTCOME success=false reason=Repeated rejected decisions: Cached inspection budget exhausted; assess the real results or stop.

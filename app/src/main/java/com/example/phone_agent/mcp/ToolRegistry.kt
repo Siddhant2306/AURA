@@ -47,7 +47,7 @@ object ToolRegistry {
         },
         tool(
             name = "tap_by_text",
-            description = "Tap the first clickable element whose text or content-description contains a query.",
+            description = "Tap a matching text, hint or description; prefer exact editable/control matches over broad ancestor text.",
             inputSchema = schema(
                 properties = buildJsonObject {
                     put("query", stringProperty("Case-insensitive text to find on screen."))
@@ -137,13 +137,13 @@ object ToolRegistry {
         arguments: JsonObject,
     ): ToolCallResult {
         val definition = tools.firstOrNull { it.name == name } ?: throw UnknownToolException(name)
-        Log.i(TAG, "tool_call name=$name args=$arguments")
+        Log.i(TAG, "tool_call name=$name")
         val result = try {
             definition.handler(arguments)
         } catch (e: Exception) {
             ToolCallResult(e.message ?: e::class.java.simpleName, isError = true)
         }
-        Log.i(TAG, "tool_result name=$name isError=${result.isError} result=${result.text.take(LOG_RESULT_LIMIT)}")
+        Log.i(TAG, "tool_result name=$name isError=${result.isError} chars=${result.text.length}")
         return result
     }
 
@@ -193,7 +193,6 @@ object ToolRegistry {
     }
 
     private const val TAG = "ToolRegistry"
-    private const val LOG_RESULT_LIMIT = 1000
 }
 
 data class ToolDefinition(

@@ -1,0 +1,73 @@
+{
+  "phone_tools_executed": false,
+  "loaded_models": {
+    "models": []
+  },
+  "requested_context": null,
+  "characters": {
+    "original": 15681,
+    "compact": 7823
+  },
+  "runs": [
+    {
+      "variant": "original",
+      "seed": 11,
+      "seconds": 13.39,
+      "done": true,
+      "done_reason": "stop",
+      "prompt_eval_count": 2050,
+      "eval_count": 58,
+      "content": "{\n  \"type\": \"stop\",\n  \"reason\": \"The user has provided a detailed UI tree of Google Chrome on Android, but there's no specific question or request to address. The UI tree shows various elements like search bar, bookmarks, and recent \"\n  }"
+    },
+    {
+      "variant": "compact",
+      "seed": 11,
+      "seconds": 5.15,
+      "done": true,
+      "done_reason": "stop",
+      "prompt_eval_count": 2309,
+      "eval_count": 53,
+      "content": "{\n  \"type\": \"act\",\n  \"goal_id\": \"s2\",\n  \"action\": {\n    \"name\": \"tap_by_text\",\n    \"arguments\": {\n      \"query\": \"Search Google or type URL\"\n    }\n  }\n}"
+    },
+    {
+      "variant": "original",
+      "seed": 22,
+      "seconds": 2.96,
+      "done": true,
+      "done_reason": "stop",
+      "prompt_eval_count": 2050,
+      "eval_count": 37,
+      "content": "{\n  \"type\": \"stop\",\n  \"reason\": \"The user's query is not clear or incomplete. Please provide more details about what you need help with.\"\n}"
+    },
+    {
+      "variant": "compact",
+      "seed": 22,
+      "seconds": 5.24,
+      "done": true,
+      "done_reason": "stop",
+      "prompt_eval_count": 2309,
+      "eval_count": 53,
+      "content": "{\n  \"type\": \"act\",\n  \"goal_id\": \"s2\",\n  \"action\": {\n    \"name\": \"tap_by_text\",\n    \"arguments\": {\n      \"query\": \"Search Google or type URL\"\n    }\n  }\n}"
+    },
+    {
+      "variant": "original",
+      "seed": 33,
+      "seconds": 4.96,
+      "done": true,
+      "done_reason": "stop",
+      "prompt_eval_count": 2050,
+      "eval_count": 57,
+      "content": "{\n  \"type\": \"stop\",\n  \"reason\": \"The user has provided a detailed UI tree of Google Chrome on Android, but there's no specific question or request in their message. The UI tree shows various elements like bookmarks, recent results, a\" }"
+    },
+    {
+      "variant": "compact",
+      "seed": 33,
+      "seconds": 4.23,
+      "done": true,
+      "done_reason": "stop",
+      "prompt_eval_count": 2309,
+      "eval_count": 53,
+      "content": "{\n  \"type\": \"act\",\n  \"goal_id\": \"s2\",\n  \"action\": {\n    \"name\": \"tap_by_text\",\n    \"arguments\": {\n      \"query\": \"Search Google or type URL\"\n    }\n  }\n}"
+    }
+  ]
+}

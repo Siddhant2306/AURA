@@ -1,0 +1,136 @@
+Live production AgentExecutor; real MCP tools and real Ollama.
+IDLE -> PLANNING: current_step=null description=null
+MODEL_REQUEST phase=plan messages=3 chars=4753 input_context=8192 retry=0
+REQUEST chars=4753 num_ctx=8192 output=256
+RESPONSE prompt_tokens=989 done_reason="stop" content={
+  "type": "plan",
+  "goals": [
+    {
+      "description": "Open Chrome",
+      "success_condition": "com.android.chrome is the current foreground package"
+    },
+    {
+      "description": "Tap the search field",
+      "success_condition": "the intended editable field is focused"
+    },
+    {
+      "description": "Type today's weather into the search field",
+      "success_condition": "editable field contains: today's weather"
+    },
+    {
+      "description": "Press Enter to show search results",
+      "success_condition": "search results appear in Chrome"
+    }
+  ]
+}
+FULL_PLAN steps=4
+PLAN_GOAL id=s1 description=Open Chrome condition=com.android.chrome is the current foreground package
+PLAN_GOAL id=s2 description=Tap the search field condition=the intended editable field is focused
+PLAN_GOAL id=s3 description=Type today's weather into the search field condition=editable field contains: today's weather
+PLAN_GOAL id=s4 description=Press Enter to show search results condition=search results appear in Chrome
+PLANNING -> CHECKING_PROGRESS: goals stored; select action dynamically
+CHECKING_PROGRESS -> PLANNING: current_step=s1 description=Open Chrome
+MODEL_REQUEST phase=decision messages=3 chars=6532 input_context=8192 retry=0
+REQUEST chars=6532 num_ctx=8192 output=128
+RESPONSE prompt_tokens=1356 done_reason="stop" content={
+  "type": "act",
+  "goal_id": "s1",
+  "action": {
+    "name": "open_app",
+    "arguments": {
+      "package_name": "com.android.chrome"
+    }
+  }
+}
+MODEL_DECISION goal=s1 type=ACT no_progress=1 repeats=1 fresh=false
+SELECTED_TOOL goal=s1 name=open_app validated_arguments={package_name="com.android.chrome"} attempt=1
+PLANNING -> EXECUTING: tool=open_app arguments={package_name="com.android.chrome"} goal=s1
+EXECUTING -> WAITING_FOR_RESULT: await actual result
+PHONE_TOOL name=open_app
+TOOL_RESULT action=1 tool=open_app is_error=false result_chars=37
+WAITING_FOR_RESULT -> WAITING_FOR_UI_SETTLE: action=1 receipt_success=true needs_observation=true
+TOOL_RETRY_COUNT tool=open_app failures=0 limit=2
+WAITING_FOR_UI_SETTLE tool=open_app
+WAITING_FOR_UI_SETTLE -> OBSERVING: UI settled; observation required
+MANDATORY_OBSERVATION goal=s1 fresh=false
+SELECTED_TOOL goal=s1 name=get_ui_tree validated_arguments={} attempt=1
+OBSERVING -> EXECUTING: tool=get_ui_tree arguments={} goal=s1
+EXECUTING -> WAITING_FOR_RESULT: await actual result
+PHONE_TOOL name=get_ui_tree
+TOOL_RESULT action=2 tool=get_ui_tree is_error=false result_chars=39399
+WAITING_FOR_RESULT -> CHECKING_PROGRESS: action=2 receipt_success=true needs_observation=false
+UI_OBSERVATION action=2 package=com.android.chrome fresh=true chars=39399
+ACTION_VERIFICATION action=1 observation=2 verified=true reason=Expected UI outcome observed
+TOOL_RETRY_COUNT tool=get_ui_tree failures=0 limit=2
+PROGRESS goal=s1 reason=first usable observation
+PROGRESS goal=s1 reason=action effect verified
+CHECKING_PROGRESS -> PLANNING: current_step=s1 description=Open Chrome
+GOAL_COMPLETION goal=s1 verified=true source_action=2 source_tool=get_ui_tree evidence_chars=18
+PROGRESS goal=s2 reason=foreground goal verified by Kotlin against fresh UI
+MODEL_REQUEST phase=decision messages=3 chars=13837 input_context=8192 retry=0
+REQUEST chars=13837 num_ctx=8192 output=128
+RESPONSE prompt_tokens=3921 done_reason="stop" content={
+  "type": "act",
+  "goal_id": "s2",
+  "action": {
+    "name": "tap_by_text",
+    "arguments": {
+      "query": "today's weather"
+    }
+  }
+}
+MODEL_DECISION goal=s2 type=ACT no_progress=1 repeats=1 fresh=true
+SELECTED_TOOL goal=s2 name=tap_by_text validated_arguments={query=<redacted:17>} attempt=1
+PLANNING -> EXECUTING: tool=tap_by_text arguments={query=<redacted:17>} goal=s2
+EXECUTING -> WAITING_FOR_RESULT: await actual result
+PHONE_TOOL name=tap_by_text
+TOOL_RESULT action=3 tool=tap_by_text is_error=false result_chars=59
+WAITING_FOR_RESULT -> WAITING_FOR_UI_SETTLE: action=3 receipt_success=true needs_observation=true
+TOOL_RETRY_COUNT tool=tap_by_text failures=0 limit=2
+WAITING_FOR_UI_SETTLE tool=tap_by_text
+WAITING_FOR_UI_SETTLE -> OBSERVING: UI settled; observation required
+MANDATORY_OBSERVATION goal=s2 fresh=false
+SELECTED_TOOL goal=s2 name=get_ui_tree validated_arguments={} attempt=1
+OBSERVING -> EXECUTING: tool=get_ui_tree arguments={} goal=s2
+EXECUTING -> WAITING_FOR_RESULT: await actual result
+PHONE_TOOL name=get_ui_tree
+TOOL_RESULT action=4 tool=get_ui_tree is_error=false result_chars=39399
+WAITING_FOR_RESULT -> CHECKING_PROGRESS: action=4 receipt_success=true needs_observation=false
+UI_OBSERVATION action=4 package=com.android.chrome fresh=true chars=39399
+ACTION_VERIFICATION action=3 observation=4 verified=false reason=Action observed; choose next action from actual screen
+CHECKING_PROGRESS -> RECOVERING: Action observed; choose next action from actual screen
+TOOL_RETRY_COUNT tool=get_ui_tree failures=0 limit=2
+RECOVERING -> PLANNING: current_step=s2 description=Tap the search field
+MODEL_REQUEST phase=decision messages=3 chars=14356 input_context=8192 retry=0
+REQUEST chars=14356 num_ctx=8192 output=128
+RESPONSE prompt_tokens=4032 done_reason="stop" content={
+  "type": "act",
+  "goal_id": "s2",
+  "action": {
+    "name": "tap_by_text",
+    "arguments": {
+      "query": "today's weather"
+    }
+  }
+}
+MODEL_DECISION goal=s2 type=ACT no_progress=2 repeats=2 fresh=true
+PLANNING -> CHECKING_PROGRESS: Duplicate confirmed action rejected: tap_by_text. Use the observed outcome to continue or complete the goal.
+REJECTED goal=s2 count=1 reason=Duplicate confirmed action rejected: tap_by_text. Use the observed outcome to continue or complete the goal.
+CHECKING_PROGRESS -> PLANNING: current_step=s2 description=Tap the search field
+MODEL_REQUEST phase=decision messages=3 chars=14286 input_context=8192 retry=0
+REQUEST chars=14286 num_ctx=8192 output=128
+RESPONSE prompt_tokens=4022 done_reason="stop" content={
+  "type": "act",
+  "goal_id": "s2",
+  "action": {
+    "name": "tap_by_text",
+    "arguments": {
+      "query": "today's weather"
+    }
+  }
+}
+MODEL_DECISION goal=s2 type=ACT no_progress=3 repeats=3 fresh=true
+PLANNING -> FAILED: Repeated model decisions made no verified goal progress: Duplicate confirmed action rejected: tap_by_text. Use the observed outcome to continue or complete the goal.
+FINAL_OUTCOME success=false reason=Repeated model decisions made no verified goal progress: Duplicate confirmed action rejected: tap_by_text. Use the observed outcome to continue or complete the goal.
+ANSWER I couldn't finish: Repeated model decisions made no verified goal progress: Duplicate confirmed action rejected: tap_by_text. Use the observed outcome to continue or complete the goal.. Remaining: Tap the search field, Type today's weather into the search field, Press Enter to show search results
+CALLS open_app, get_ui_tree, tap_by_text, get_ui_tree

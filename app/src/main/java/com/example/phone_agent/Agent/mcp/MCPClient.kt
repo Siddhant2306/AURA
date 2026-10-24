@@ -99,7 +99,6 @@ class MCPClient(
         arguments: JsonObject,
     ): McpToolResult {
         Log.d("MCP", "Calling tool: $name")
-        Log.d("MCP", "Arguments: $arguments")
         val result = rpc(
             method = "tools/call",
             params = buildJsonObject {
@@ -107,7 +106,7 @@ class MCPClient(
                 put("arguments", arguments)
             },
         )
-        Log.d("MCP", "Tool result: $result")
+        Log.d("MCP", "Tool result received: tool=$name")
         val contentText = result["content"]
             ?.jsonArray
             ?.joinToString(separator = "\n") { item ->
@@ -143,7 +142,6 @@ class MCPClient(
 
         Log.d("MCP", "Response received: ${response.status}")
         val body: JsonObject = response.body()
-        Log.d("MCP", "Response body: $body")
         if (!response.status.isSuccess()) {
             throw McpClientException("MCP HTTP ${response.status.value}: $body")
         }

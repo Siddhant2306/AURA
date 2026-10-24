@@ -12,9 +12,9 @@ import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import androidx.annotation.RequiresApi
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
@@ -45,8 +45,11 @@ class PhoneControlService : AccessibilityService() {
     }
 
     override fun onDestroy() {
-        instance = null
-        currentPackageName = null
+        // A replaced service can finish destruction after its replacement connects.
+        if (instance === this) {
+            instance = null
+            currentPackageName = null
+        }
         super.onDestroy()
     }
 
@@ -72,7 +75,7 @@ class PhoneControlService : AccessibilityService() {
     suspend fun getUiTree(): String = withContext(Dispatchers.Main) {
         val root = rootInActiveWindow ?: throw IllegalStateException("No active window is available")
         buildJsonObject {
-            currentPackageName?.let { put("package", it) }
+            (root.packageName?.toString() ?: currentPackageName)?.let { put("package", it) }
             put("tree", serializeNode(root, depth = 0))
         }.toString()
     }
@@ -87,15 +90,27 @@ class PhoneControlService : AccessibilityService() {
     suspend fun tapByText(query: String): String = withContext(Dispatchers.Main) {
         require(query.isNotBlank()) { "query must not be blank" }
         val root = rootInActiveWindow ?: throw IllegalStateException("No active window is available")
-        val matchingNode = findFirstNodeContaining(root, query)
-            ?: throw IllegalStateException("No node text or content-description contains '$query'")
-        val clickableNode = nearestClickableAncestor(matchingNode)
-            ?: throw IllegalStateException("Found '$query', but no clickable ancestor was available")
-
-        check(clickableNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-            "Click action failed for '$query'"
+        val candidates = mutableListOf<NodeCandidate>()
+        collectCandidates(root, candidates)
+        val target = candidates.mapNotNull { candidate ->
+            if (!candidate.node.isVisibleToUser || !candidate.node.isEnabled) return@mapNotNull null
+            val score = TextTargetRanking.score(query, listOf(clean(candidate.text), clean(candidate.description), clean(candidate.hint)),
+                candidate.editable, candidate.node.isClickable) ?: return@mapNotNull null
+            nearestClickableAncestor(candidate.node)?.let { score to candidate }
+        }.maxByOrNull { it.first }?.second
+            ?: throw IllegalStateException("No actionable node text, hint or description matches '$query'")
+        if (target.editable) {
+            // Chrome virtual text fields may acknowledge ACTION_CLICK without activating input.
+            // A gesture targets the observed field itself; the agent still verifies fresh focus afterward.
+            check(target.bounds.width() > 0 && target.bounds.height() > 0) { "Matched input has no visible bounds" }
+            val path = Path().apply { moveTo(target.bounds.exactCenterX(), target.bounds.exactCenterY()) }
+            check(performGesture(path, TAP_DURATION_MS)) { "Input tap gesture failed for '$query'" }
+        } else {
+            check(nearestClickableAncestor(target.node)?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) {
+                "Click action failed for '$query'"
+            }
         }
-        "Tapped first clickable element containing '$query'"
+        "Tapped best exact/actionable match for '$query'"
     }
 
     suspend fun typeText(text: String): String = withContext(Dispatchers.Main) {
@@ -112,13 +127,19 @@ class PhoneControlService : AccessibilityService() {
         val candidates = mutableListOf<NodeCandidate>()
         collectCandidates(root, candidates)
 
-        val target = candidates.firstOrNull { it.editable && it.contains(query) }
+        val target = candidates.filter { it.editable && it.node.isVisibleToUser && it.node.isEnabled }
+            .mapNotNull { candidate -> TextTargetRanking.score(query, listOf(candidate.text, candidate.description, candidate.hint), true, candidate.node.isClickable)?.let { it to candidate } }
+            .maxByOrNull { it.first }?.second
             ?: nearestEditableToLabel(candidates, query)
             ?: throw IllegalStateException("No editable field found near '$query'")
 
-        target.node.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-        target.node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-        setText(target.node, text)
+        check(target.bounds.width() > 0 && target.bounds.height() > 0) { "Matched input has no visible bounds" }
+        val path = Path().apply { moveTo(target.bounds.exactCenterX(), target.bounds.exactCenterY()) }
+        check(performGesture(path, TAP_DURATION_MS)) { "Input activation gesture failed" }
+        delay(150)
+        val focused = findFocusedEditableNode() ?: throw IllegalStateException("Matched input did not become focused")
+        focused.refresh()
+        setText(focused, text)
         "Typed ${text.length} characters into the field near '$query'"
     }
 
@@ -149,12 +170,13 @@ class PhoneControlService : AccessibilityService() {
         "Sent BACK"
     }
 
-    @RequiresApi(Build.VERSION_CODES.R)
     suspend fun pressEnter(): String = withContext(Dispatchers.Main) {
+        check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            "IME submit requires Android 11 or later. Inspect the UI and tap its visible search/submit control instead."
+        }
         val focusedNode = findFocusedEditableNode()
             ?: throw IllegalStateException("No editable field is focused to submit")
-        val submitted = focusedNode.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id) ||
-            focusedNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        val submitted = focusedNode.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
         check(submitted) { "Could not submit the focused field" }
         "Pressed enter/submit on the focused field"
     }
@@ -211,6 +233,7 @@ class PhoneControlService : AccessibilityService() {
             })
             if (node.isClickable) put("clickable", true)
             if (node.isEditable) put("editable", true)
+            if (node.isFocused) put("focused", true)
             if (children.isNotEmpty()) put("children", children)
         }
     }

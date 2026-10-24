@@ -1,0 +1,34 @@
+Production prompt replay; phone tools are not executed.
+REQUEST chars=11583 num_ctx=8192 output=128
+RESPONSE prompt_tokens=3531 done_reason="stop" content={
+  "type": "act",
+  "goal_id": "s2",
+  "action": {
+    "name": "tap_by_text",
+    "arguments": {
+      "query": "Search Google or type URL"
+    }
+  }
+}
+REQUEST chars=11583 num_ctx=8192 output=128
+RESPONSE prompt_tokens=3531 done_reason="stop" content={
+  "type": "act",
+  "goal_id": "s2",
+  "action": {
+    "name": "tap_by_text",
+    "arguments": {
+      "query": "Search Google or type URL"
+    }
+  }
+}
+REQUEST chars=11583 num_ctx=8192 output=128
+RESPONSE prompt_tokens=3531 done_reason="stop" content={
+  "type": "act",
+  "goal_id": "s2",
+  "action": {
+    "name": "tap_by_text",
+    "arguments": {
+      "query": "Search Google or type URL"
+    }
+  }
+}

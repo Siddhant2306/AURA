@@ -9,7 +9,7 @@ data class FridayAgentConfig(
     val ollamaModel: String,
     val mcpBaseUrl: String,
     val mcpBearerToken: String,
-    val maxSteps: Int = 12,
+    val maxSteps: Int = 48,
 )
 
 object FridayAgentFactory {

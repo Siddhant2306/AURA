@@ -1,0 +1,94 @@
+{
+  "phone_tools_executed": false,
+  "loaded_models": {
+    "models": [
+      {
+        "name": "qwen3:4b",
+        "model": "qwen3:4b",
+        "size": 3534917467,
+        "digest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+        "details": {
+          "parent_model": "",
+          "format": "gguf",
+          "family": "qwen3",
+          "families": [
+            "qwen3"
+          ],
+          "parameter_size": "4.0B",
+          "quantization_level": "Q4_K_M"
+        },
+        "expires_at": "2026-10-24T15:06:56.1775456+05:30",
+        "size_vram": 2344636907,
+        "context_length": 4096,
+        "runner": "llamacpp"
+      }
+    ]
+  },
+  "requested_context": 8192,
+  "characters": {
+    "original": 15681,
+    "compact": 7823
+  },
+  "runs": [
+    {
+      "variant": "original",
+      "seed": 11,
+      "seconds": 18.61,
+      "done": true,
+      "done_reason": "stop",
+      "prompt_eval_count": 4513,
+      "eval_count": 55,
+      "content": "{\n  \"type\": \"act\",\n  \"goal_id\": \"s2\",\n  \"action\": {\n    \"name\": \"tap_by_text\",\n    \"arguments\": {\n      \"query\": \"Search Google or type URL\"\n    }\n  }\n  }"
+    },
+    {
+      "variant": "compact",
+      "seed": 11,
+      "seconds": 8.01,
+      "done": true,
+      "done_reason": "stop",
+      "prompt_eval_count": 2309,
+      "eval_count": 53,
+      "content": "{\n  \"type\": \"act\",\n  \"goal_id\": \"s2\",\n  \"action\": {\n    \"name\": \"tap_by_text\",\n    \"arguments\": {\n      \"query\": \"Search Google or type URL\"\n    }\n  }\n}"
+    },
+    {
+      "variant": "original",
+      "seed": 22,
+      "seconds": 8.62,
+      "done": true,
+      "done_reason": "stop",
+      "prompt_eval_count": 4513,
+      "eval_count": 55,
+      "content": "{\n  \"type\": \"act\",\n  \"goal_id\": \"s2\",\n  \"action\": {\n    \"name\": \"tap_by_text\",\n    \"arguments\": {\n      \"query\": \"Search Google or type URL\"\n    }\n  }\n  }"
+    },
+    {
+      "variant": "compact",
+      "seed": 22,
+      "seconds": 6.7,
+      "done": true,
+      "done_reason": "stop",
+      "prompt_eval_count": 2309,
+      "eval_count": 53,
+      "content": "{\n  \"type\": \"act\",\n  \"goal_id\": \"s2\",\n  \"action\": {\n    \"name\": \"tap_by_text\",\n    \"arguments\": {\n      \"query\": \"Search Google or type URL\"\n    }\n  }\n}"
+    },
+    {
+      "variant": "original",
+      "seed": 33,
+      "seconds": 8.08,
+      "done": true,
+      "done_reason": "stop",
+      "prompt_eval_count": 4513,
+      "eval_count": 55,
+      "content": "{\n  \"type\": \"act\",\n  \"goal_id\": \"s2\",\n  \"action\": {\n    \"name\": \"tap_by_text\",\n    \"arguments\": {\n      \"query\": \"Search Google or type URL\"\n    }\n  }\n  }"
+    },
+    {
+      "variant": "compact",
+      "seed": 33,
+      "seconds": 6.89,
+      "done": true,
+      "done_reason": "stop",
+      "prompt_eval_count": 2309,
+      "eval_count": 53,
+      "content": "{\n  \"type\": \"act\",\n  \"goal_id\": \"s2\",\n  \"action\": {\n    \"name\": \"tap_by_text\",\n    \"arguments\": {\n      \"query\": \"Search Google or type URL\"\n    }\n  }\n}"
+    }
+  ]
+}
