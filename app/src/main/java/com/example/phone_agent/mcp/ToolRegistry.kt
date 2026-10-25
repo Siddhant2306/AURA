@@ -8,11 +8,18 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.floatOrNull
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 object ToolRegistry {
     val tools: List<ToolDefinition> = listOf(
+        tool("find_app", "Find installed launchable apps in the current profile by name/package. For Phone/call app returns the default dialer. Use returned packages; do not guess.", schema(
+            properties = buildJsonObject { put("query", stringProperty("User's app name, e.g. Instagram, Spotify, WhatsApp or Phone")) }, required = listOf("query")
+        )) { args -> ToolCallResult(service().findApp(args.requireString("query"))) },
         tool(
             name = "open_app",
             description = "Open an installed Android app by package name.",
@@ -51,11 +58,17 @@ object ToolRegistry {
             inputSchema = schema(
                 properties = buildJsonObject {
                     put("query", stringProperty("Case-insensitive text to find on screen."))
+                    put("view_id", stringProperty("Optional exact view_id from the latest UI tree to disambiguate controls."))
+                    put("bounds", buildJsonObject { put("type", "array"); put("items", buildJsonObject { put("type", "integer") }); put("minItems", 4); put("maxItems", 4) })
+                    put("prefer_gesture", buildJsonObject { put("type", "boolean"); put("description", "Use a physical tap on a fresh observed target when accessibility click did not change the UI.") })
                 },
                 required = listOf("query"),
             ),
         ) { args ->
-            ToolCallResult(service().tapByText(args.requireString("query")))
+            val bounds = args["bounds"]?.jsonArray?.map { it.jsonPrimitive.intOrNull ?: error("bounds must contain integers") }
+            require(bounds == null || bounds.size == 4 && bounds[2] > bounds[0] && bounds[3] > bounds[1]) { "bounds must be [left,top,right,bottom] with positive area" }
+            ToolCallResult(service().tapByText(args.requireString("query"), args["view_id"]?.jsonPrimitive?.contentOrNull, bounds,
+                args["prefer_gesture"]?.jsonPrimitive?.booleanOrNull ?: false))
         },
         tool(
             name = "type_text",
@@ -89,7 +102,7 @@ object ToolRegistry {
         },
         tool(
             name = "swipe",
-            description = "Swipe from one absolute screen coordinate to another.",
+            description = "Swipe a finger inside the observed screen/scrollable bounds. Left: x1>x2; right: x1<x2; up: y1>y2; down: y1<y2. Avoid system edges. Gesture delivery does not prove content movement.",
             inputSchema = schema(
                 properties = buildJsonObject {
                     put("x1", numberProperty("Start X coordinate."))
@@ -140,6 +153,7 @@ object ToolRegistry {
         Log.i(TAG, "tool_call name=$name")
         val result = try {
             definition.handler(arguments)
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e
         } catch (e: Exception) {
             ToolCallResult(e.message ?: e::class.java.simpleName, isError = true)
         }
@@ -152,7 +166,16 @@ object ToolRegistry {
         description: String,
         inputSchema: JsonObject,
         handler: suspend (JsonObject) -> ToolCallResult,
-    ): ToolDefinition = ToolDefinition(name, description, inputSchema, handler)
+    ): ToolDefinition {
+        val anchored = name in setOf("tap", "tap_by_text", "type_text", "type_into_field_near", "swipe", "press_enter")
+        val effectiveSchema = if (!anchored) inputSchema else JsonObject(inputSchema + ("properties" to JsonObject(
+            inputSchema.getValue("properties").jsonObject + ("expected_package" to stringProperty("Kotlin supplies the package from the authoritative UI observation; reject if the foreground changed before this action."))
+        )))
+        return ToolDefinition(name, description, effectiveSchema) { args ->
+            args["expected_package"]?.jsonPrimitive?.contentOrNull?.let { service().requireForegroundPackage(it) }
+            handler(args)
+        }
+    }
 
     private fun service(): PhoneControlService =
         PhoneControlService.instance

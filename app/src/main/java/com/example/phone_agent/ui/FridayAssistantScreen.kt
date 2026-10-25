@@ -67,6 +67,7 @@ import com.example.phone_agent.agent.FridayAgent
 import com.example.phone_agent.agent.FridayAgentConfig
 import com.example.phone_agent.agent.FridayAgentFactory
 import com.example.phone_agent.agent.core.AgentSession
+import com.example.phone_agent.agent.core.FailureMessage
 import com.example.phone_agent.agent.voice.FridayVoiceController
 import com.example.phone_agent.agent.voice.FridayVoiceMode
 import com.example.phone_agent.agent.voice.FridayVoiceState
@@ -599,6 +600,7 @@ private suspend fun runFridayCommand(
         )
         Log.d("FridayAgent", "PREFLIGHT ready=${preflight.ready} accessibility=${PhoneControlService.instance != null} server=${McpForegroundService.isRunning}")
         if (!preflight.ready) {
+            onProgress(preflight.message)
             voiceController.speak(preflight.message)
             return@runExclusive
         }
@@ -607,10 +609,12 @@ private suspend fun runFridayCommand(
             FridayAgentFactory.create(context, config).run(command) { progress ->
                 onProgress(progress)
             }.answer
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e
         } catch (e: Exception) {
             Log.e("FridayAgent", "Run failed", e)
-            "I hit an error: ${e.message ?: e::class.java.simpleName}"
+            "I couldn't finish: ${FailureMessage.explain(e.message ?: e::class.java.simpleName)}"
         }
+        onProgress(spokenAnswer)
         voiceController.speak(spokenAnswer)
     }
 }

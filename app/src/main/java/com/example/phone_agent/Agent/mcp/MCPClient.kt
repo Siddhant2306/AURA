@@ -113,9 +113,10 @@ class MCPClient(
                 item.jsonObject["text"]?.jsonPrimitive?.contentOrNull.orEmpty()
             }
             .orEmpty()
+        val structured = result["structuredContent"] as? JsonObject
         return McpToolResult(
-            text = contentText.ifBlank { result.toString() },
-            isError = result["isError"]?.jsonPrimitive?.booleanOrNull == true,
+            text = contentText.ifBlank { structured?.toString() ?: "Malformed MCP result: no text content" },
+            isError = contentText.isBlank() && structured == null || result["isError"]?.jsonPrimitive?.booleanOrNull == true,
             rawJson = result,
         )
     }
@@ -141,23 +142,23 @@ class MCPClient(
         }
 
         Log.d("MCP", "Response received: ${response.status}")
-        val body: JsonObject = response.body()
         if (!response.status.isSuccess()) {
-            throw McpClientException("MCP HTTP ${response.status.value}: $body")
+            throw McpClientException("MCP HTTP ${response.status.value}")
         }
+        val body: JsonObject = response.body()
 
         body["error"]?.let { error ->
             throw McpClientException(formatRpcError(error))
         }
         return body["result"]?.jsonObject
-            ?: throw McpClientException("MCP response did not include a JSON object result: $body")
+            ?: throw McpClientException("MCP response did not include a JSON object result")
     }
 
     private fun formatRpcError(error: JsonElement): String {
-        val objectError = error as? JsonObject ?: return "MCP RPC error: $error"
+        val objectError = error as? JsonObject ?: return "Malformed MCP RPC error"
         val code = objectError["code"]?.jsonPrimitive?.intOrNull
         val message = objectError["message"]?.jsonPrimitive?.contentOrNull
-        return "MCP RPC error ${code ?: "unknown"}: ${message ?: objectError}"
+        return "MCP RPC error ${code ?: "unknown"}: ${message?.take(200) ?: "Unspecified server error"}"
     }
 }
 

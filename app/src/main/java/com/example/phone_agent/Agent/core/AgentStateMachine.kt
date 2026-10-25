@@ -84,7 +84,7 @@ class AgentStateMachine(command: String, private val log: (String) -> Unit = {})
         check(pendingVerification() == null || call.name == "get_ui_tree") { "Previous UI action is not verified" }
         check(recoveryError(call) == null) { recoveryError(call).orEmpty() }
         if (ToolExecutionPolicy.isUiChanging(call.name))
-            check(!state.needsObservation || state.actions.isEmpty() && call.name == "open_app") { "Fresh UI is required" }
+            check(!state.needsObservation || call.name == "open_app" && lastMutation() == null && state.actions.none { it.call.name == "get_ui_tree" }) { "Fresh UI is required" }
         transition(AgentStatus.EXECUTING, "tool=${call.name} arguments=${safeArguments(call.arguments)} goal=${state.currentStep?.id}", AgentStatus.PLANNING, AgentStatus.OBSERVING)
         state = state.copy(activeTool = call.copy(expectedUi = expectedOutcome(call)))
         transition(AgentStatus.WAITING_FOR_RESULT, "await actual result", AgentStatus.EXECUTING)
@@ -130,8 +130,12 @@ class AgentStateMachine(command: String, private val log: (String) -> Unit = {})
         val mutation = lastMutation()?.takeIf { it.stepId == observation.stepId && it.screenRevision == observation.screenRevision } ?: return
         val screen = state.currentScreen?.let { UiObservation.parse(it) } ?: return
         val expected = mutation.expectedUi
-        val verified = expected != null && screen.matches(expected)
-        val reason = if (verified) "Expected UI outcome observed" else if (expected == null) "Action observed; choose next action from actual screen" else "Expected UI outcome not established"
+        val preexistingTapPredicate = mutation.call.name in setOf("tap", "tap_by_text") && expected != null && expected.focusedEditable != true && expected.editableText == null &&
+            mutation.beforeScreen?.let { UiObservation.parse(it)?.matches(expected) } == true
+        val verified = expected != null && screen.matches(expected) && !preexistingTapPredicate
+        val reason = if (verified) "Expected UI outcome observed" else if (preexistingTapPredicate)
+            "The tap expectation was already true before the action; use a destination-specific condition such as selected_text or focused_editable"
+            else if (expected == null) "Action observed; choose next action from actual screen" else "Expected UI outcome not established"
         state = state.copy(actions = state.actions.map { if (it.id == mutation.id) it.copy(verified = verified, verificationReason = reason) else it })
         log("ACTION_VERIFICATION action=${mutation.id} observation=${observation.id} verified=$verified reason=$reason")
         if (!verified) transition(AgentStatus.RECOVERING, reason, AgentStatus.CHECKING_PROGRESS)

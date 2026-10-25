@@ -8,7 +8,7 @@ import java.util.Locale
 /** Parses the registry's {package, tree:{text,desc,editable,focused,children:[...]}} output. */
 internal class UiObservation private constructor(val root: JsonObject, val nodes: List<JsonObject>) {
     val packageName: String? get() = (root["package"] as? JsonPrimitive)?.contentOrNull
-    val visibleText: String get() = nodes.flatMap { node -> listOfNotNull(
+    val visibleText: String get() = nodes.filter { it["visible"]?.toString() != "false" }.flatMap { node -> listOfNotNull(
         (node["text"] as? JsonPrimitive)?.contentOrNull,
         (node["desc"] as? JsonPrimitive)?.contentOrNull,
     ) }.joinToString(" ")
@@ -22,6 +22,7 @@ internal class UiObservation private constructor(val root: JsonObject, val nodes
         val words = normalize(context).split(Regex("[^\\p{L}\\p{N}]+"))
             .filter { it.length >= 3 && it !in setOf("the", "and", "field", "current", "goal", "show", "results", "appear") }.toSet()
         val entries = nodes.flatMapIndexed { index, node ->
+            if (node["visible"]?.toString() == "false") return@flatMapIndexed emptyList()
             val plain = node.filterKeys { it != "children" }
             val long = plain.filter { it.key in setOf("text", "desc", "hint") && (it.value as? JsonPrimitive)?.contentOrNull.orEmpty().length > 2_000 }
             val base = plain - long.keys
@@ -52,6 +53,7 @@ internal class UiObservation private constructor(val root: JsonObject, val nodes
         val selected = pages.getOrElse(page.coerceAtLeast(0)) { pages.last() }.sortedBy { it.first }
         return buildJsonObject {
             root["package"]?.let { put("package", it) }
+            root["screen"]?.let { put("screen", it) }
             put("tree", buildJsonObject { put("children", JsonArray(selected.map { it.third })) })
             put("truncated", true); put("page", page.coerceIn(0, pages.lastIndex)); put("page_count", pages.size)
             put("omitted_entries", entries.size - selected.size)
@@ -61,7 +63,12 @@ internal class UiObservation private constructor(val root: JsonObject, val nodes
         if (!valid(expected)) return false
         if (expected.packageName != null && packageName?.trim() != expected.packageName.trim()) return false
         if (expected.text != null && !normalize(visibleText).contains(normalize(expected.text))) return false
-        val editable = nodes.filter { (it["editable"] as? JsonPrimitive)?.booleanOrNull == true }
+        if (expected.selectedText != null && nodes.none { node ->
+            node["visible"]?.toString() != "false" && node["enabled"]?.toString() != "false" &&
+            (node["selected"]?.toString() == "true" || node["checked"]?.toString() == "true") &&
+            listOf("text", "desc").any { normalize((node[it] as? JsonPrimitive)?.contentOrNull.orEmpty()).contains(normalize(expected.selectedText)) }
+        }) return false
+        val editable = nodes.filter { (it["editable"] as? JsonPrimitive)?.booleanOrNull == true && it["visible"]?.toString() != "false" && it["enabled"]?.toString() != "false" }
         val matchingEditable = if (expected.editableText == null) editable else editable.filter {
             normalize((it["text"] as? JsonPrimitive)?.contentOrNull.orEmpty()) == normalize(expected.editableText)
         }
@@ -72,13 +79,21 @@ internal class UiObservation private constructor(val root: JsonObject, val nodes
         return true
     }
     fun inputText(): String? {
-        val editable = nodes.filter { (it["editable"] as? JsonPrimitive)?.booleanOrNull == true }
+        val editable = nodes.filter { (it["editable"] as? JsonPrimitive)?.booleanOrNull == true && it["visible"]?.toString() != "false" && it["enabled"]?.toString() != "false" }
         val target = editable.firstOrNull { (it["focused"] as? JsonPrimitive)?.booleanOrNull == true }
             ?: editable.singleOrNull() ?: return null
         return (target["text"] as? JsonPrimitive)?.contentOrNull.orEmpty()
     }
     fun tapsOnlyEditable(call: AgentToolCall): Boolean {
-        val editables = nodes.filter { (it["editable"] as? JsonPrimitive)?.booleanOrNull == true }
+        val editables = nodes.filter { node ->
+            (node["editable"] as? JsonPrimitive)?.booleanOrNull == true && node["visible"]?.toString() != "false" && node["enabled"]?.toString() != "false" &&
+                ((call.arguments["view_id"] as? JsonPrimitive)?.contentOrNull?.let { it == (node["view_id"] as? JsonPrimitive)?.contentOrNull } ?: true) &&
+                ((call.arguments["bounds"] as? JsonArray)?.let { selector ->
+                    val region = selector.mapNotNull { (it as? JsonPrimitive)?.doubleOrNull }
+                    val box = (node["bounds"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.doubleOrNull }.orEmpty()
+                    region.size == 4 && box.size == 4 && (box[0] + box[2]) / 2 in region[0]..region[2] && (box[1] + box[3]) / 2 in region[1]..region[3]
+                } ?: true)
+        }
         return when (call.name) {
             "tap_by_text" -> (call.arguments["query"] as? JsonPrimitive)?.contentOrNull?.let { query ->
                 normalize(query).isNotBlank() && editables.count { target -> listOf("text", "desc", "hint").any {
@@ -105,10 +120,10 @@ internal class UiObservation private constructor(val root: JsonObject, val nodes
             val tree = root["tree"] as? JsonObject ?: return null
             val nodes = mutableListOf<JsonObject>()
             fun visit(node: JsonObject): Boolean {
-                for (key in listOf("text", "desc", "class", "package")) {
+                for (key in listOf("text", "desc", "hint", "view_id", "class", "package")) {
                     if (key in node && (node[key] !is JsonPrimitive || !(node[key] as JsonPrimitive).isString)) return false
                 }
-                for (key in listOf("editable", "focused", "clickable")) {
+                for (key in listOf("editable", "focused", "clickable", "visible", "enabled", "selected", "checked", "scrollable")) {
                     val flag = node[key] as? JsonPrimitive
                     if (key in node && (flag == null || flag.isString || flag.booleanOrNull == null)) return false
                 }
@@ -119,6 +134,7 @@ internal class UiObservation private constructor(val root: JsonObject, val nodes
             }
             val structurallyValid = visit(tree)
             val usable = nodes.any { node ->
+                if (node["visible"]?.toString() == "false") return@any false
                 listOf("text", "desc").any { (node[it] as? JsonPrimitive)?.contentOrNull?.isNotBlank() == true } ||
                     listOf("editable", "clickable").any { (node[it] as? JsonPrimitive)?.booleanOrNull == true } ||
                     ((node["class"] as? JsonPrimitive)?.contentOrNull?.isNotBlank() == true &&
@@ -131,8 +147,8 @@ internal class UiObservation private constructor(val root: JsonObject, val nodes
             else UiObservation(root, nodes)
         }.getOrNull()
         fun valid(e: UiExpectation): Boolean =
-            (e.packageName != null || e.text != null || e.editableText != null || e.focusedEditable != null) &&
-                e.packageName?.isBlank() != true && e.text?.isBlank() != true
+            (e.packageName != null || e.text != null || e.editableText != null || e.focusedEditable != null || e.selectedText != null) &&
+                e.packageName?.isBlank() != true && e.text?.isBlank() != true && e.selectedText?.isBlank() != true
         fun normalize(text: String): String = Normalizer.normalize(text, Normalizer.Form.NFKC)
             .lowercase(Locale.ROOT).replace(Regex("\\s+"), " ").trim()
     }

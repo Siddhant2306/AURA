@@ -221,7 +221,7 @@ class DynamicAgentTest {
                 else -> wire(AgentPlan(AgentResponseType.STOP, reason = "No action performed"))
             }
         }, { "Full original system prompt" }, limits = ExecutionLimits(maxJsonRetries = 99), settle = {}).run("read")
-        assertTrue(result.answer.contains("Repeated invalid model responses"))
+        assertTrue(result.answer.contains("model did not return a valid action"))
         assertTrue(provider.calls.isEmpty())
         assertEquals(listOf("plan", "plan"), requests.map { it.getValue("request_phase").jsonPrimitive.content })
         assertEquals(listOf(0, 1), requests.map { it.getValue("response_retry").jsonPrimitive.int })
@@ -240,7 +240,7 @@ class DynamicAgentTest {
             }
         }, { "Original system prompt with tool rules" }, settle = {}).run("read")
         assertEquals(4, result.stepsUsed)
-        assertTrue(result.answer.contains("Repeated invalid model responses"))
+        assertTrue(result.answer.contains("model did not return a valid action"))
         assertFalse(requests[1].any { it.content.contains("Original system prompt") || it.content.contains("available_tools") })
         val decision = Json.parseToJsonElement(requests[2].last().content).jsonObject
         assertEquals("s1", decision.getValue("current_goal").jsonPrimitive.content)

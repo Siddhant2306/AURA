@@ -107,7 +107,7 @@ class UiVerificationTest {
         val p = Fake { c, _ -> result(if (c.name == "get_ui_tree") screen("com.other") else "Opened successfully") }
         val r = engine(p, List(8) { FixtureDecision(plan = listOf("Open"), toolCalls = listOf(open)) }).run("open")
         assertEquals(2, p.calls.count { it.name == "open_app" })
-        assertTrue(r.answer.contains("Retry limit"))
+        assertTrue(r.answer.contains("not making verified progress"))
     }
     @Test fun verificationMatchesNormalizedNodeValuesAcrossChildren() {
         val m = AgentStateMachine("read")
@@ -221,13 +221,13 @@ class UiVerificationTest {
         val r = engine(p, listOf(FixtureDecision(plan = listOf("Open"), toolCalls = listOf(open))), limits = ExecutionLimits(maxTurns = 1)).run("open")
         assertEquals(listOf("open_app", "get_ui_tree"), p.calls.map { it.name })
         assertEquals(2, r.stepsUsed)
-        assertTrue(r.answer.contains("decision limit"))
+        assertTrue(r.answer.contains("not making verified progress"))
     }
     @Test fun noMutationExecutesWhenToolBudgetCannotIncludeObservation() = runBlocking {
         val p = Fake { _, _ -> result("Opened") }
         val r = engine(p, listOf(FixtureDecision(plan = listOf("Open"), toolCalls = listOf(open))), limits = ExecutionLimits(maxTools = 1)).run("open")
         assertTrue(p.calls.isEmpty())
-        assertTrue(r.answer.contains("no budget to observe"))
+        assertTrue(r.answer.contains("not making verified progress"))
     }
     @Test fun missingObservationIsNotMisclassifiedAsDuplicateSuccess() {
         val m = AgentStateMachine("open")
@@ -271,7 +271,7 @@ class UiVerificationTest {
             assertEquals("Bad observation: $bad", listOf("open_app", "get_ui_tree", "get_ui_tree"), p.calls.map { it.name })
             assertEquals(2, r.stepsUsed)
             assertEquals(2, r.toolResults.count { it.isError })
-            assertTrue(r.answer.contains("fresh screen observation within the retry limit"))
+            assertTrue(r.answer.contains("usable screen"))
         }
     }
     @Test fun usableLayoutWithBoundsIsAcceptedWithoutText() = runBlocking {
@@ -307,7 +307,7 @@ class UiVerificationTest {
         val p = Fake { _, count -> result(screen(text = "Clock tick $count")) }
         val logs = mutableListOf<String>()
         val r = engine(p, List(20) { FixtureDecision(plan = listOf("Read required results"), toolCalls = listOf(observe.copy(recoveryReason = "Wait for pending page results"))) }, logs).run("read")
-        assertTrue(r.answer, r.answer.contains("Repeated model decision") || r.answer.contains("Repeated rejected decisions"))
+        assertTrue(r.answer, r.answer.contains("not making verified progress"))
         assertTrue(r.stepsUsed <= 5)
         assertTrue(p.calls.size <= 3)
         assertEquals(1, logs.count { it.startsWith("FULL_PLAN") })
@@ -317,7 +317,7 @@ class UiVerificationTest {
         val p = Fake { _, _ -> result(screen()) }
         val plans = List(20) { i -> FixtureDecision(plan = listOf("Read"), toolCalls = listOf(if (i % 2 == 0) observe else AgentToolCall("unknown"))) }
         val r = engine(p, plans).run("read")
-        assertTrue(r.answer, r.answer.contains("Repeated model decision") || r.answer.contains("Repeated rejected decisions"))
+        assertTrue(r.answer, r.answer.contains("not making verified progress"))
         assertTrue(r.stepsUsed <= 6)
         assertTrue(p.calls.size <= 2)
     }
@@ -326,7 +326,7 @@ class UiVerificationTest {
         val plans = listOf(FixtureDecision(plan = listOf("Open"), toolCalls = listOf(open))) +
             List(10) { FixtureDecision(completion = StepCompletion("s1", 50 + it, "com.example.browser")) }
         val r = engine(p, plans).run("open")
-        assertTrue(r.answer, r.answer.contains("Repeated model decision") || r.answer.contains("Repeated rejected decisions"))
+        assertTrue(r.answer, r.answer.contains("not making verified progress"))
         assertTrue(r.stepsUsed <= 5)
         assertEquals(listOf("open_app", "get_ui_tree"), p.calls.map { it.name })
     }

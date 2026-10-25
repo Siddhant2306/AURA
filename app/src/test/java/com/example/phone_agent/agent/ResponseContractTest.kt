@@ -172,7 +172,7 @@ class ResponseContractTest {
         val goals = format("plan").first().getValue("properties").jsonObject.getValue("goals").jsonObject.getValue("items").jsonObject
         assertEquals(setOf("description", "success_condition"), required(goals))
         val expectation = goals.getValue("properties").jsonObject.getValue("expected_ui").jsonObject
-        assertEquals(setOf("package_name", "text", "editable_text", "focused_editable"), expectation.getValue("properties").jsonObject.keys)
+        assertEquals(setOf("package_name", "text", "editable_text", "focused_editable", "selected_text"), expectation.getValue("properties").jsonObject.keys)
         assertEquals(1, expectation.getValue("minProperties").jsonPrimitive.int)
         assertEquals(setOf("type", "reason"), required(format("plan").last()))
         val evidence = format("decision")[1].getValue("properties").jsonObject.getValue("evidence").jsonObject

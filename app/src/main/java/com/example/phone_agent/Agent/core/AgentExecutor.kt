@@ -37,9 +37,19 @@ class AgentExecutor(
         var turns = 0
         fun stopped(reason: String): AgentRunResult {
             machine.failTask(reason)
-            log("FINAL_OUTCOME success=false reason=${reason.take(300)}")
+            log("FINAL_OUTCOME success=false category=${FailureMessage.explain(reason)}")
             val remaining = machine.state.pendingSteps.joinToString { it.description }
-            return AgentRunResult("I couldn't finish: $reason" + if (remaining.isBlank()) "" else ". Remaining: $remaining", results.toList(), turns)
+            val failedTool = machine.state.actions.lastOrNull { it.stepId == machine.state.currentStep?.id && it.call.name != "get_ui_tree" &&
+                (!it.succeeded || it.verified == false && it.expectedUi != null) }
+            val detail = failedTool?.let { action -> if (!action.succeeded) FailureMessage.explain(action.result) else when (action.call.name) {
+                "open_app" -> "The requested app did not become the observed foreground app."
+                "type_text", "type_into_field_near" -> "The requested text was not confirmed in the intended input."
+                else -> "The screen did not show the expected result of the last action."
+            } }?.takeIf { it != FailureMessage.explain(reason) }
+            val done = machine.state.completedSteps.joinToString { it.description }
+            return AgentRunResult("I couldn't finish: ${FailureMessage.explain(reason)}" +
+                (detail?.let { " $it" } ?: "") + (if (done.isBlank()) "" else " Completed: $done.") +
+                if (remaining.isBlank()) "" else ". Remaining: $remaining", results.toList(), turns)
         }
         if (command.isBlank()) return stopped("Please enter a command")
         return try {
@@ -170,7 +180,12 @@ class AgentExecutor(
                         continue
                     }
                     malformed = 0
-                    val decision = parsed.response
+                    val proposed = parsed.response
+                    val proposal = proposed.action
+                    val observedPackage = machine.state.currentScreen?.let { UiObservation.parse(it)?.packageName }
+                    val canAnchor = proposal != null && (tools.firstOrNull { it.name == proposal.name }?.inputSchema?.get("properties") as? JsonObject)?.containsKey("expected_package") == true
+                    val decision = if (canAnchor && observedPackage != null) proposed.copy(action = proposal!!.copy(
+                        arguments = JsonObject(proposal.arguments + ("expected_package" to JsonPrimitive(observedPackage))))) else proposed
                     if (decision.type == AgentResponseType.STOP) return@withTimeoutOrNull stopped(requireNotNull(decision.reason))
                     if (decision.type == AgentResponseType.PLAN) {
                         val goals = requireNotNull(decision.goals)

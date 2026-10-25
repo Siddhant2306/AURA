@@ -5,6 +5,11 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.GestureDescription
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.ComponentName
+import android.telecom.TelecomManager
+import android.util.DisplayMetrics
+import android.view.WindowManager
+import android.view.accessibility.AccessibilityWindowInfo
 import android.graphics.Path
 import android.graphics.Rect
 import android.os.Build
@@ -55,60 +60,97 @@ class PhoneControlService : AccessibilityService() {
 
     suspend fun openApp(packageName: String): String = withContext(Dispatchers.Main) {
         require(packageName.isNotBlank()) { "package_name must not be blank" }
-
-        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
-            ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            ?: Intent(Intent.ACTION_MAIN).apply {
-                addCategory(Intent.CATEGORY_LAUNCHER)
-                setPackage(packageName)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
+        if (activeApplicationRoot()?.packageName?.toString() == packageName)
+            return@withContext "App $packageName is already foreground; verify the current UI"
+        val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(packageName)
+        val resolved = packageManager.queryIntentActivities(launcher, 0).firstOrNull { it.activityInfo?.enabled == true && it.activityInfo.packageName == packageName }
+        val component = resolved?.activityInfo?.let { ComponentName(it.packageName, it.name) }
+            ?: packageManager.getLaunchIntentForPackage(packageName)?.component
+            ?: throw IllegalStateException("No launchable activity is visible for $packageName in Friday's current user profile. Check installation, enabled state and package visibility.")
+        val launchIntent = Intent.makeMainActivity(component).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        Log.i(TAG, "APP_LAUNCH package=$packageName component=${component.flattenToShortString()}")
 
         try {
             startActivity(launchIntent)
-            "Opened app package $packageName"
+            "Launch requested for $packageName; component=${component.flattenToShortString()}. Verify the foreground UI."
         } catch (e: ActivityNotFoundException) {
             throw IllegalStateException("No launchable activity found for $packageName", e)
         }
     }
 
+    suspend fun findApp(query: String): String = withContext(Dispatchers.Main) {
+        require(query.isNotBlank()) { "query must not be blank" }
+        val dialer = getSystemService(TelecomManager::class.java)?.defaultDialerPackage
+        val wantsDialer = query.trim().lowercase() in setOf("phone", "call", "dialer", "phone app", "call app")
+        val apps = packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+            .filter { it.activityInfo?.enabled == true }
+            .filter { info -> if (wantsDialer && dialer != null) info.activityInfo.packageName == dialer else
+                info.loadLabel(packageManager).toString().contains(query, true) || info.activityInfo.packageName.contains(query, true) }
+            .sortedByDescending { it.loadLabel(packageManager).toString().equals(query, true) }
+            .distinctBy { it.activityInfo.packageName }.take(5)
+        buildJsonObject { put("apps", buildJsonArray { apps.forEach { info -> add(buildJsonObject {
+            put("label", info.loadLabel(packageManager).toString()); put("package_name", info.activityInfo.packageName)
+            put("launcher", ComponentName(info.activityInfo.packageName, info.activityInfo.name).flattenToShortString())
+        }) } }); put("current_profile_only", true) }.toString()
+    }
+
+    suspend fun requireForegroundPackage(expected: String) = withContext(Dispatchers.Main) {
+        val actual = activeApplicationRoot()?.packageName?.toString()
+        check(actual == expected) { "Screen changed before action: expected package $expected, observed ${actual ?: "no application window"}. Observe again before acting." }
+    }
+
     suspend fun getUiTree(): String = withContext(Dispatchers.Main) {
-        val root = rootInActiveWindow ?: throw IllegalStateException("No active window is available")
-        buildJsonObject {
-            (root.packageName?.toString() ?: currentPackageName)?.let { put("package", it) }
-            put("tree", serializeNode(root, depth = 0))
-        }.toString()
+        fun snapshot(): JsonObject? {
+            val root = activeApplicationRoot() ?: return null
+            return buildJsonObject {
+                (root.packageName?.toString() ?: currentPackageName)?.let { put("package", it) }
+                val metrics = screenMetrics()
+                put("screen", buildJsonObject { put("width", metrics.widthPixels); put("height", metrics.heightPixels) })
+                put("tree", serializeNode(root, depth = 0))
+            }
+        }
+        var previous: JsonObject? = null
+        repeat(10) {
+            val next = snapshot()
+            if (next != null && previous == next) return@withContext next.toString()
+            previous = next
+            delay(120)
+        }
+        previous?.toString() ?: throw IllegalStateException("No active application window became available within the observation timeout")
     }
 
     suspend fun tap(x: Float, y: Float): String {
-        require(x >= 0 && y >= 0) { "tap coordinates must be non-negative" }
+        val metrics = screenMetrics(); GestureBounds.validate(metrics.widthPixels, metrics.heightPixels, x, y)
         val path = Path().apply { moveTo(x, y) }
         check(performGesture(path, TAP_DURATION_MS)) { "Tap gesture was cancelled or rejected" }
         return "Tapped at (${x.toInt()}, ${y.toInt()})"
     }
 
-    suspend fun tapByText(query: String): String = withContext(Dispatchers.Main) {
+    suspend fun tapByText(query: String, viewId: String? = null, targetBounds: List<Int>? = null, preferGesture: Boolean = false): String = withContext(Dispatchers.Main) {
         require(query.isNotBlank()) { "query must not be blank" }
-        val root = rootInActiveWindow ?: throw IllegalStateException("No active window is available")
+        require(targetBounds == null || targetBounds.size == 4 && targetBounds[2] > targetBounds[0] && targetBounds[3] > targetBounds[1]) { "Invalid target bounds" }
+        val root = activeApplicationRoot() ?: throw IllegalStateException("No active window is available")
         val candidates = mutableListOf<NodeCandidate>()
         collectCandidates(root, candidates)
         val target = candidates.mapNotNull { candidate ->
             if (!candidate.node.isVisibleToUser || !candidate.node.isEnabled) return@mapNotNull null
+            if (viewId != null && candidate.node.viewIdResourceName != viewId) return@mapNotNull null
+            if (targetBounds != null && !Rect(targetBounds[0], targetBounds[1], targetBounds[2], targetBounds[3]).contains(candidate.bounds.centerX(), candidate.bounds.centerY())) return@mapNotNull null
             val score = TextTargetRanking.score(query, listOf(clean(candidate.text), clean(candidate.description), clean(candidate.hint)),
                 candidate.editable, candidate.node.isClickable) ?: return@mapNotNull null
             nearestClickableAncestor(candidate.node)?.let { score to candidate }
-        }.maxByOrNull { it.first }?.second
-            ?: throw IllegalStateException("No actionable node text, hint or description matches '$query'")
-        if (target.editable) {
+        }.groupBy { nearestClickableAncestor(it.second.node) }.map { it.value.maxBy { entry -> entry.first } }.sortedByDescending { it.first }
+        if (target.isEmpty()) throw IllegalStateException("No actionable node text, hint or description matches '$query'")
+        check(target.size == 1 || target[0].first > target[1].first) { "Ambiguous text target; provide the observed view_id or bounds, or use a grounded coordinate tap" }
+        val chosen = target.first().second
+        val clickTarget = nearestClickableAncestor(chosen.node)
+        if (chosen.editable || preferGesture || clickTarget?.performAction(AccessibilityNodeInfo.ACTION_CLICK) != true) {
             // Chrome virtual text fields may acknowledge ACTION_CLICK without activating input.
             // A gesture targets the observed field itself; the agent still verifies fresh focus afterward.
-            check(target.bounds.width() > 0 && target.bounds.height() > 0) { "Matched input has no visible bounds" }
-            val path = Path().apply { moveTo(target.bounds.exactCenterX(), target.bounds.exactCenterY()) }
+            check(chosen.bounds.width() > 0 && chosen.bounds.height() > 0) { "Matched control has no visible bounds" }
+            val metrics = screenMetrics(); GestureBounds.validate(metrics.widthPixels, metrics.heightPixels, chosen.bounds.exactCenterX(), chosen.bounds.exactCenterY())
+            val path = Path().apply { moveTo(chosen.bounds.exactCenterX(), chosen.bounds.exactCenterY()) }
             check(performGesture(path, TAP_DURATION_MS)) { "Input tap gesture failed for '$query'" }
-        } else {
-            check(nearestClickableAncestor(target.node)?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) {
-                "Click action failed for '$query'"
-            }
         }
         "Tapped best exact/actionable match for '$query'"
     }
@@ -123,13 +165,15 @@ class PhoneControlService : AccessibilityService() {
 
     suspend fun typeIntoFieldNear(query: String, text: String): String = withContext(Dispatchers.Main) {
         require(query.isNotBlank()) { "query must not be blank" }
-        val root = rootInActiveWindow ?: throw IllegalStateException("No active window is available")
+        val root = activeApplicationRoot() ?: throw IllegalStateException("No active window is available")
         val candidates = mutableListOf<NodeCandidate>()
         collectCandidates(root, candidates)
 
-        val target = candidates.filter { it.editable && it.node.isVisibleToUser && it.node.isEnabled }
+        val ranked = candidates.filter { it.editable && it.node.isVisibleToUser && it.node.isEnabled }
             .mapNotNull { candidate -> TextTargetRanking.score(query, listOf(candidate.text, candidate.description, candidate.hint), true, candidate.node.isClickable)?.let { it to candidate } }
-            .maxByOrNull { it.first }?.second
+            .sortedByDescending { it.first }
+        check(ranked.size < 2 || ranked[0].first > ranked[1].first) { "Ambiguous editable field; focus a specific observed input before typing" }
+        val target = ranked.firstOrNull()?.second
             ?: nearestEditableToLabel(candidates, query)
             ?: throw IllegalStateException("No editable field found near '$query'")
 
@@ -137,9 +181,15 @@ class PhoneControlService : AccessibilityService() {
         val path = Path().apply { moveTo(target.bounds.exactCenterX(), target.bounds.exactCenterY()) }
         check(performGesture(path, TAP_DURATION_MS)) { "Input activation gesture failed" }
         delay(150)
-        val focused = findFocusedEditableNode() ?: throw IllegalStateException("Matched input did not become focused")
-        focused.refresh()
-        setText(focused, text)
+        var focused: AccessibilityNodeInfo? = null
+        repeat(5) {
+            target.node.refresh()
+            if (target.node.isFocused && target.node.isEditable) focused = target.node
+            if (focused == null) findFocusedEditableNode()?.let { candidate -> if (nodeContains(candidate, query)) focused = candidate }
+            if (focused == null) delay(100)
+        }
+        val input = focused ?: throw IllegalStateException("Matched input did not become focused; no text was written")
+        setText(input, text)
         "Typed ${text.length} characters into the field near '$query'"
     }
 
@@ -149,15 +199,13 @@ class PhoneControlService : AccessibilityService() {
         x2: Float,
         y2: Float,
     ): String {
-        require(x1 >= 0 && y1 >= 0 && x2 >= 0 && y2 >= 0) {
-            "swipe coordinates must be non-negative"
-        }
+        val metrics = screenMetrics(); GestureBounds.validate(metrics.widthPixels, metrics.heightPixels, x1, y1, x2, y2)
         val path = Path().apply {
             moveTo(x1, y1)
             lineTo(x2, y2)
         }
         check(performGesture(path, SWIPE_DURATION_MS)) { "Swipe gesture was cancelled or rejected" }
-        return "Swiped from (${x1.toInt()}, ${y1.toInt()}) to (${x2.toInt()}, ${y2.toInt()})"
+        return "Swipe gesture delivered from (${x1.toInt()}, ${y1.toInt()}) to (${x2.toInt()}, ${y2.toInt()}); observe whether the content moved"
     }
 
     suspend fun goHome(): String = withContext(Dispatchers.Main) {
@@ -224,6 +272,13 @@ class PhoneControlService : AccessibilityService() {
         return buildJsonObject {
             clean(node.text?.toString())?.let { put("text", it) }
             clean(node.contentDescription?.toString())?.let { put("desc", it) }
+            clean(node.hintTextCompat())?.let { put("hint", it) }
+            node.viewIdResourceName?.let { put("view_id", it) }
+            put("visible", node.isVisibleToUser); put("enabled", node.isEnabled)
+            if (node.isSelected) put("selected", true)
+            if (node.isCheckable) put("checked", node.isChecked)
+            if (node.isScrollable) put("scrollable", true)
+            if (node.actionList.isNotEmpty()) put("actions", buildJsonArray { node.actionList.forEach { add(it.id) } })
             clean(node.className?.toString())?.let { put("class", it.substringAfterLast('.')) }
             put("bounds", buildJsonArray {
                 add(bounds.left)
@@ -270,13 +325,13 @@ class PhoneControlService : AccessibilityService() {
 
     private fun findFocusedEditableNode(): AccessibilityNodeInfo? {
         val focused = findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        if (focused?.isEditable == true) return focused
-        val root = rootInActiveWindow ?: return null
+        if (focused?.isEditable == true && focused.isVisibleToUser && focused.isEnabled && focused.isFocused) return focused
+        val root = activeApplicationRoot() ?: return null
         return findFirstEditable(root)
     }
 
     private fun findFirstEditable(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
-        if (node.isEditable && node.isFocused) return node
+        if (node.isEditable && node.isFocused && node.isVisibleToUser && node.isEnabled) return node
         for (index in 0 until node.childCount) {
             val child = node.getChild(index) ?: continue
             val match = findFirstEditable(child)
@@ -317,9 +372,14 @@ class PhoneControlService : AccessibilityService() {
         candidates: List<NodeCandidate>,
         query: String,
     ): NodeCandidate? {
-        val label = candidates.firstOrNull { !it.editable && it.contains(query) } ?: return null
+        val labels = candidates.filter { !it.editable && it.node.isVisibleToUser && it.node.isEnabled }
+            .mapNotNull { candidate -> TextTargetRanking.score(query, listOf(candidate.text, candidate.description, candidate.hint), false, candidate.node.isClickable)?.let { it to candidate } }
+            .sortedByDescending { it.first }
+        if (labels.isEmpty()) return null
+        check(labels.size < 2 || labels[0].first > labels[1].first || labels[0].second.bounds == labels[1].second.bounds) { "Ambiguous nearby label; use a specific observed input" }
+        val label = labels.first().second
         return candidates
-            .filter { it.editable }
+            .filter { it.editable && it.node.isVisibleToUser && it.node.isEnabled && it.bounds.width() > 0 && it.bounds.height() > 0 }
             .minByOrNull { editable ->
                 label.bounds.centerDistanceTo(editable.bounds) +
                     if (editable.bounds.top >= label.bounds.top) 0.0 else ABOVE_LABEL_PENALTY
@@ -346,6 +406,17 @@ class PhoneControlService : AccessibilityService() {
         } else {
             0
         }
+
+    @Suppress("DEPRECATION")
+    private fun screenMetrics() = DisplayMetrics().also { (getSystemService(WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(it) }
+
+    private fun activeApplicationRoot(): AccessibilityNodeInfo? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) clearCache()
+        val applicationWindows = windows.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+        val root = applicationWindows.firstOrNull { it.isFocused }?.root
+            ?: applicationWindows.firstOrNull { it.isActive }?.root ?: rootInActiveWindow
+        return root?.takeIf { it.refresh() }
+    }
 
     private fun clean(value: String?): String? =
         value

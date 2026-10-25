@@ -53,6 +53,7 @@ object OllamaOutput {
             put("package_name", string()); put("text", string())
             put("editable_text", buildJsonObject { put("type", "string") })
             put("focused_editable", buildJsonObject { put("type", "boolean") })
+            put("selected_text", string())
         }).let { JsonObject(it + ("minProperties" to JsonPrimitive(1))) }
         val stop = obj(buildJsonObject { put("type", tag("stop")); put("reason", string(200)) }, "type", "reason")
         val currentGoal = (state?.get("current_goal") as? JsonPrimitive)?.contentOrNull

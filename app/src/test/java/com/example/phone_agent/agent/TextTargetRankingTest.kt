@@ -5,6 +5,11 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TextTargetRankingTest {
+    @Test fun actionableTabDescriptionBeatsUnclickableSearchHeading() {
+        val heading = TextTargetRanking.score("Search", listOf("Search"), false, false)!!
+        val tab = TextTargetRanking.score("Search", listOf("Search, Tab 2 of 5"), false, true)!!
+        assertTrue(tab > heading)
+    }
     @Test fun editableMatchBeatsBroadPageAncestorAndDuplicateHeading() {
         val ancestor = TextTargetRanking.score("today's weather", listOf("Google today's weather results and many links"), false, true)!!
         val heading = TextTargetRanking.score("today's weather", listOf("today's weather"), false, true)!!

@@ -117,6 +117,7 @@ data class UiExpectation(
     val text: String? = null,
     @SerialName("editable_text") val editableText: String? = null,
     @SerialName("focused_editable") val focusedEditable: Boolean? = null,
+    @SerialName("selected_text") val selectedText: String? = null,
 )
 
 data class AgentRunResult(

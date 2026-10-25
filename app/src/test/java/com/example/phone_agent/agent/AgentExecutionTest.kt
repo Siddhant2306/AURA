@@ -131,14 +131,14 @@ class AgentExecutionTest {
     @Test fun decisionAndToolLimitsStopCleanly() = runBlocking {
         val p = FakeProvider()
         val r = executor(p, List(5) { FixtureDecision(plan = listOf("Read"), toolCalls = listOf(observe)) }, ExecutionLimits(maxTurns = 2)).run("read")
-        assertEquals(3, r.stepsUsed); assertTrue(r.answer.contains("decision limit"))
+        assertEquals(3, r.stepsUsed); assertTrue(r.answer.contains("not making verified progress"))
         val r2 = executor(p, List(5) { FixtureDecision(plan = listOf("Read"), toolCalls = listOf(observe)) }, ExecutionLimits(maxTools = 1)).run("read")
-        assertEquals(1, r2.toolResults.size); assertTrue(r2.answer.contains("Repeated"))
+        assertEquals(1, r2.toolResults.size); assertTrue(r2.answer.contains("not making verified progress"))
     }
     @Test fun timeoutAndCancellationAreHandled() = runBlocking {
         val p = FakeProvider().apply { response = { delay(500); result() } }
         val r = executor(p, listOf(FixtureDecision(plan = listOf("Read"), toolCalls = listOf(observe))), ExecutionLimits(timeoutMillis = 20)).run("read")
-        assertTrue(r.answer.contains("time limit"))
+        assertTrue(r.answer.contains("timed out"))
         val engine = AgentExecutor(p, { throw CancellationException("cancel") }, { "" })
         try { engine.run("read"); fail("Cancellation swallowed") } catch (_: CancellationException) {}
     }
@@ -153,7 +153,7 @@ class AgentExecutionTest {
         val engine = AgentExecutor(p, { "invalid" }, { "" }, settle = {})
         assertEquals(2, engine.run("read").stepsUsed)
         val r = executor(p, List(4) { FixtureDecision() }).run("read")
-        assertTrue(r.answer.contains("invalid model responses"))
+        assertTrue(r.answer.contains("model did not return a valid action"))
         assertTrue(engine.run(" ").answer.contains("enter a command"))
     }
     @Test fun stateTransitionsAndEvidenceAreValidated() {
@@ -257,7 +257,7 @@ class AgentExecutionTest {
         val r = executor(p, List(10) { FixtureDecision(plan = listOf("Open browser", "Search"), toolCalls = listOf(open)) }, requests = requests).run("search")
         assertEquals(listOf("open_app", "get_ui_tree"), p.calls.map { it.name })
         assertEquals(5, r.stepsUsed)
-        assertTrue(r.answer.contains("Duplicate confirmed action rejected"))
+        assertTrue(r.answer.contains("not making verified progress"))
         requests.drop(1).forEach { request ->
             val state = Json.parseToJsonElement(request.last().content).jsonObject
             assertEquals(2, state.getValue("goals").jsonArray.size)
@@ -272,7 +272,7 @@ class AgentExecutionTest {
         val r = executor(p, listOf(FixtureDecision(plan = listOf("Open browser"), toolCalls = listOf(open))), requests = requests).run("open")
         assertEquals(listOf("open_app", "get_ui_tree", "get_ui_tree"), p.calls.map { it.name })
         assertEquals(1, requests.size)
-        assertTrue(r.answer.contains("fresh screen observation within the retry limit"))
+        assertTrue(r.answer.contains("usable screen"))
     }
     @Test fun latestObservationSupersedesOlderEvidenceEvenWithoutAgentMutation() {
         val m = AgentStateMachine("read")
